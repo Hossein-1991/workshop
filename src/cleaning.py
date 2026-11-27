@@ -44,3 +44,26 @@ def clean_survey_scores(df: pd.DataFrame) -> pd.DataFrame:
             ) / sample_sd
 
     return cleaned
+
+
+def flag_outliers(
+    df: pd.DataFrame, z_col: str = "score_z", threshold: float = 2.5
+) -> pd.DataFrame:
+    """Return a copy of df with a boolean is_outlier column.
+
+    A row is flagged as an outlier (True) when the absolute value of z_col
+    strictly exceeds threshold. Missing (NaN) values in z_col and values
+    within [-threshold, threshold] are flagged as False.
+    Fails loudly if df is not a pandas DataFrame or if z_col is missing.
+    """
+    if not isinstance(df, pd.DataFrame):
+        raise TypeError("df must be a pandas DataFrame")
+
+    if z_col not in df.columns:
+        raise ValueError(f"df is missing column: {z_col}")
+
+    result = df.copy()
+    z_series = result[z_col]
+    result["is_outlier"] = z_series.notna() & (z_series.abs() > threshold)
+    return result
+
