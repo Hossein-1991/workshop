@@ -2,7 +2,7 @@ import numpy as np
 import pandas as pd
 import pytest
 
-from src.cleaning import clean_survey_scores
+from src.cleaning import clean_survey_scores, flag_outliers
 
 
 def golden_input():
@@ -102,3 +102,43 @@ def test_invariants_for_nonconstant_valid_scores():
     assert len(result) <= len(df)
     assert valid.mean() == pytest.approx(0.0, abs=1e-12)
     assert valid.std(ddof=1) == pytest.approx(1.0, abs=1e-12)
+
+
+def test_flag_outliers_identifies_values_beyond_threshold():
+    df = pd.DataFrame(
+        {
+            "respondent_id": [1, 2, 3, 4, 5],
+            "score_z": [-3.0, -2.5, 0.0, 2.5, 2.6],
+        }
+    )
+    res = flag_outliers(df, threshold=2.5)
+    assert res["is_outlier"].tolist() == [True, False, False, False, True]
+
+
+def test_flag_outliers_missing_z_scores_are_false():
+    df = pd.DataFrame(
+        {
+            "respondent_id": [1, 2],
+            "score_z": [np.nan, 3.2],
+        }
+    )
+    res = flag_outliers(df)
+    assert res["is_outlier"].tolist() == [False, True]
+
+
+def test_flag_outliers_missing_z_col_raises():
+    df = pd.DataFrame({"respondent_id": [1], "val": [1.0]})
+    with pytest.raises(ValueError, match="missing column: score_z"):
+        flag_outliers(df)
+
+
+def test_flag_outliers_wrong_type_raises():
+    with pytest.raises(TypeError, match="pandas DataFrame"):
+        flag_outliers({"score_z": [1.0]})
+
+
+def test_flag_outliers_does_not_mutate_input():
+    df = pd.DataFrame({"respondent_id": [1, 2], "score_z": [3.0, 0.5]})
+    original = df.copy(deep=True)
+    flag_outliers(df)
+    pd.testing.assert_frame_equal(df, original)
